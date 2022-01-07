@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/gofiber/fiber/v2"
@@ -69,5 +70,16 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(token)
+	cookie := fiber.Cookie{
+		Name:     "jwd",
+		Value:    token,
+		Expires:  time.Now().Add(time.Hour * 24),
+		HTTPOnly: true,
+	}
+
+	c.Cookie(&cookie)
+
+	return c.JSON(fiber.Map{
+		"message": "success!",
+	})
 }
