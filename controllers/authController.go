@@ -35,19 +35,19 @@ func Register(c *fiber.Ctx) error {
 func Login(c *fiber.Ctx) error {
 	var data map[string]string
 
-	err := c.BodyParser(&data)
-	if err != nil {
+	if err := c.BodyParser(&data); err != nil {
 		return err
 	}
 
 	var user models.User
+
 	database.DB.Where("email = ?", data["email"]).First(&user)
 
 	if user.Id == 0 {
-		c.Status((fiber.StatusNotFound))
-		return c.JSON((fiber.Map{
+		c.Status(fiber.StatusNotFound)
+		return c.JSON(fiber.Map{
 			"message": "user not found",
-		}))
+		})
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(data["password"])); err != nil {
@@ -59,10 +59,11 @@ func Login(c *fiber.Ctx) error {
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		Issuer: strconv.Itoa(int(user.Id)),
-		// ExpiresAt: time.Now().Add(time.Minute * 15).Unix(),
+		// ExpiresAt: time.Now().Add(time.Hour * 24).Unix(), //1 day
 	})
 
 	token, err := claims.SignedString([]byte(SecretKey))
+
 	if err != nil {
 		c.Status(fiber.StatusInternalServerError)
 		return c.JSON(fiber.Map{
@@ -71,7 +72,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	cookie := fiber.Cookie{
-		Name:     "jwd",
+		Name:     "jwt",
 		Value:    token,
 		Expires:  time.Now().Add(time.Hour * 24),
 		HTTPOnly: true,
@@ -80,23 +81,21 @@ func Login(c *fiber.Ctx) error {
 	c.Cookie(&cookie)
 
 	return c.JSON(fiber.Map{
-		"message": "success!",
+		"message": "success",
 	})
 }
 
-func User(c *fiber.Ctx) error {
-	cookie := c.Cookies("jwt")
-
-	token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return []byte(SecretKey), nil
-	})
-
-	if err != nil {
-		c.Status((fiber.StatusUnauthorized))
-		return c.JSON(fiber.Map{
-			"message": "unauthenticated",
-		})
+func Logout(c *fiber.Ctx) error {
+	cookie := fiber.Cookie{
+		Name:     "jwt",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
 	}
-	claims := token.Claims
-	return c.JSON(claims)
+
+	c.Cookie(&cookie)
+
+	return c.JSON(fiber.Map{
+		"message": "success",
+	})
 }
